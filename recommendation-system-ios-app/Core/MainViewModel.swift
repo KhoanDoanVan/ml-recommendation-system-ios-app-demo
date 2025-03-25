@@ -15,6 +15,9 @@ final class MainViewModel: ObservableObject {
     @Published private(set) var shirts: [Shirt] = []
     @Published private(set) var recommendations: [Shirt] = []
     
+    
+    private var recommendationsTask: Task<Void, Never>?
+    
     private let recommendationStore: RecommendationStore
     
     // MARK: - Init
@@ -50,6 +53,27 @@ final class MainViewModel: ObservableObject {
         
         if let index = allShirts.firstIndex(where: { $0.model.id == item.id }) {
             allShirts[index] = FavouriteWrapper(model: item, isFavourite: isLiked)
+        }
+        
+        
+        /// Cancel any ongoing computation task since the user may swipe quickly.
+        recommendationsTask?.cancel()
+        
+        
+        recommendationsTask = Task {
+            
+            do {
+                let result = try await recommendationStore.computeRecommendations(basedOn: allShirts)
+                
+                /// Check for the canceled task, because by the time the result is ready, you might have canceled it.
+                if !Task.isCancelled {
+                    recommendations = result
+                }
+                
+            } catch {
+                print(error.localizedDescription)
+            }
+            
         }
     }
     
